@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: workhive
+    runtime: node
+    region: singapore
+    plan: free
+    buildCommand: cd frontend && npm install && npm run build && cd ../backend && npm install
+    startCommand: cd backend && node src/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DB_PATH
+        value: /var/data
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+    disk:
+      name: workhive-data
+      mountPath: /var/data
+      sizeGB: 1
