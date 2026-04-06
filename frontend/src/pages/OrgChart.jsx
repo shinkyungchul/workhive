@@ -94,7 +94,7 @@ export default function OrgChart() {
 
       <div ref={canvasRef}
         className="relative bg-gray-50 rounded-xl border border-gray-200 overflow-hidden"
-        style={{ height: '600px' }}
+        style={{ height: 'calc(100vh - 180px)', minHeight: '400px' }}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}>
