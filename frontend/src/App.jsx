@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Tasks from './pages/Tasks';
 import OrgChart from './pages/OrgChart';
 import Board from './pages/Board';
+import Profile from './pages/Profile';
 
 function PrivateRoute({ children }) {
   const { isLoggedIn } = useAuth();
@@ -28,6 +29,7 @@ function App() {
             <Route path="tasks" element={<Tasks />} />
             <Route path="org" element={<OrgChart />} />
             <Route path="board" element={<Board />} />
+            <Route path="profile" element={<Profile />} />
           </Route>
         </Routes>
       </BrowserRouter>

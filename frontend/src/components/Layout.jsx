@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { BarChart3, CheckSquare, Network, LogOut, User, Menu, X, BookOpen } from 'lucide-react';
+import { BarChart3, CheckSquare, Network, LogOut, User, Menu, X, BookOpen, Settings } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../AuthContext';
 import ManualPanel from './ManualPanel';
@@ -60,8 +60,12 @@ export default function Layout() {
               <p className="text-xs text-gray-400">{user?.role}{user?.dept ? ` · ${user.dept}` : ''}</p>
             </div>
           </div>
+          <NavLink to="/profile" onClick={() => setSidebarOpen(false)}
+            className={({ isActive }) => `w-full flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition mt-1 ${isActive ? 'text-blue-600 bg-blue-50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}>
+            <Settings size={16} /> 개인설정
+          </NavLink>
           <button onClick={handleLogout}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition mt-1">
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition">
             <LogOut size={16} /> 로그아웃
           </button>
         </div>
