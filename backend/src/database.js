@@ -62,6 +62,16 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW()
     )`);
 
+    await client.query(`CREATE TABLE IF NOT EXISTS board_posts (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      content TEXT DEFAULT '',
+      user_id TEXT NOT NULL REFERENCES users(id),
+      pinned BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )`);
+
     console.log('Database tables initialized (PostgreSQL)');
   } finally {
     client.release();

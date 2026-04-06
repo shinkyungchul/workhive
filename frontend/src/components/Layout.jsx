@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { BarChart3, CheckSquare, Network, LogOut, User, Menu, X } from 'lucide-react';
+import { BarChart3, CheckSquare, Network, LogOut, User, Menu, X, BookOpen } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../AuthContext';
 import ManualPanel from './ManualPanel';
@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: '/', icon: BarChart3, label: '대시보드' },
   { to: '/tasks', icon: CheckSquare, label: '업무관리' },
   { to: '/org', icon: Network, label: '조직도' },
+  { to: '/board', icon: BookOpen, label: '관리 메뉴얼' },
 ];
 
 export default function Layout() {

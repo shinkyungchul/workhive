@@ -11,6 +11,7 @@ const orgRoutes = require('./routes/orgRoutes');
 const exportRoutes = require('./routes/exportRoutes');
 const commentRoutes = require('./routes/commentRoutes');
 const attachmentRoutes = require('./routes/attachmentRoutes');
+const boardRoutes = require('./routes/boardRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -26,6 +27,7 @@ app.use('/api/org', orgRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/attachments', attachmentRoutes);
+app.use('/api/board', boardRoutes);
 
 // 프론트엔드 정적 파일 서빙 (빌드 후)
 const frontendPath = path.join(__dirname, '..', '..', 'frontend', 'dist');
