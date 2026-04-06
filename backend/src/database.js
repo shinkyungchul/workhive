@@ -72,6 +72,15 @@ async function initDB() {
       updated_at TIMESTAMP DEFAULT NOW()
     )`);
 
+    await client.query(`CREATE TABLE IF NOT EXISTS links (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      url TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      user_id TEXT NOT NULL REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT NOW()
+    )`);
+
     console.log('Database tables initialized (PostgreSQL)');
   } finally {
     client.release();

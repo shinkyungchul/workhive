@@ -13,6 +13,7 @@ const commentRoutes = require('./routes/commentRoutes');
 const attachmentRoutes = require('./routes/attachmentRoutes');
 const boardRoutes = require('./routes/boardRoutes');
 const profileRoutes = require('./routes/profileRoutes');
+const linkRoutes = require('./routes/linkRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -30,6 +31,7 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/attachments', attachmentRoutes);
 app.use('/api/board', boardRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/links', linkRoutes);
 
 // 프론트엔드 정적 파일 서빙 (빌드 후)
 const frontendPath = path.join(__dirname, '..', '..', 'frontend', 'dist');
