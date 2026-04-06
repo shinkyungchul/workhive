@@ -3,7 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
-const { getDB, save } = require('../database');
+const { getDB } = require('../database');
 const { authMiddleware } = require('../auth');
 
 const router = express.Router();
@@ -22,7 +22,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowed = /\.(jpg|jpeg|png|gif|pdf|doc|docx|xls|xlsx|ppt|pptx|txt|zip|hwp)$/i;
     if (allowed.test(path.extname(file.originalname))) cb(null, true);
@@ -30,39 +30,28 @@ const upload = multer({
   }
 });
 
-function rowsToObjects(result) {
-  if (!result.length) return [];
-  const cols = result[0].columns;
-  return result[0].values.map(row => {
-    const obj = {};
-    cols.forEach((c, i) => obj[c] = row[i]);
-    return obj;
-  });
-}
-
 // 첨부파일 목록
-router.get('/:taskId', authMiddleware, (req, res) => {
+router.get('/:taskId', authMiddleware, async (req, res) => {
   const db = getDB();
-  const result = db.exec(
+  const result = await db.query(
     `SELECT a.*, u.name as user_name FROM attachments a
      JOIN users u ON a.user_id = u.id
-     WHERE a.task_id = ? ORDER BY a.created_at ASC`,
+     WHERE a.task_id = $1 ORDER BY a.created_at ASC`,
     [req.params.taskId]
   );
-  res.json(rowsToObjects(result));
+  res.json(result.rows);
 });
 
 // 파일 업로드
-router.post('/:taskId', authMiddleware, upload.single('file'), (req, res) => {
+router.post('/:taskId', authMiddleware, upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: '파일을 선택하세요' });
 
   const db = getDB();
   const id = uuidv4();
-  db.run(
-    "INSERT INTO attachments (id, task_id, user_id, filename, original_name, size) VALUES (?, ?, ?, ?, ?, ?)",
+  await db.query(
+    "INSERT INTO attachments (id, task_id, user_id, filename, original_name, size) VALUES ($1, $2, $3, $4, $5, $6)",
     [id, req.params.taskId, req.user.id, req.file.filename, req.file.originalname, req.file.size]
   );
-  save();
 
   res.status(201).json({
     id, task_id: req.params.taskId, user_id: req.user.id,
@@ -71,31 +60,30 @@ router.post('/:taskId', authMiddleware, upload.single('file'), (req, res) => {
 });
 
 // 파일 다운로드
-router.get('/download/:filename', authMiddleware, (req, res) => {
+router.get('/download/:filename', authMiddleware, async (req, res) => {
   const db = getDB();
-  const result = db.exec("SELECT original_name FROM attachments WHERE filename = ?", [req.params.filename]);
-  if (!result.length || !result[0].values.length) return res.status(404).json({ error: '파일을 찾을 수 없습니다' });
+  const result = await db.query("SELECT original_name FROM attachments WHERE filename = $1", [req.params.filename]);
+  if (result.rows.length === 0) return res.status(404).json({ error: '파일을 찾을 수 없습니다' });
 
-  const originalName = result[0].values[0][0];
+  const originalName = result.rows[0].original_name;
   const filePath = path.join(UPLOAD_DIR, req.params.filename);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: '파일이 존재하지 않습니다' });
 
   res.download(filePath, originalName);
 });
 
-// 파일 삭제 (작성자만)
-router.delete('/:id', authMiddleware, (req, res) => {
+// 파일 삭제
+router.delete('/:id', authMiddleware, async (req, res) => {
   const db = getDB();
-  const result = db.exec("SELECT user_id, filename FROM attachments WHERE id = ?", [req.params.id]);
-  if (!result.length || !result[0].values.length) return res.status(404).json({ error: '파일을 찾을 수 없습니다' });
-  if (result[0].values[0][0] !== req.user.id) return res.status(403).json({ error: '업로더만 삭제할 수 있습니다' });
+  const result = await db.query("SELECT user_id, filename FROM attachments WHERE id = $1", [req.params.id]);
+  if (result.rows.length === 0) return res.status(404).json({ error: '파일을 찾을 수 없습니다' });
+  if (result.rows[0].user_id !== req.user.id) return res.status(403).json({ error: '업로더만 삭제할 수 있습니다' });
 
-  const filename = result[0].values[0][1];
+  const filename = result.rows[0].filename;
   const filePath = path.join(UPLOAD_DIR, filename);
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
-  db.run("DELETE FROM attachments WHERE id = ?", [req.params.id]);
-  save();
+  await db.query("DELETE FROM attachments WHERE id = $1", [req.params.id]);
   res.json({ success: true });
 });
 

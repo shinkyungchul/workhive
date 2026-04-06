@@ -1,30 +1,30 @@
 const express = require('express');
-const { getDB, save } = require('../database');
+const { getDB } = require('../database');
 const { authMiddleware } = require('../auth');
 
 const router = express.Router();
 
 // 조직도 위치 조회
-router.get('/positions', authMiddleware, (req, res) => {
+router.get('/positions', authMiddleware, async (req, res) => {
   const db = getDB();
-  const result = db.exec("SELECT * FROM org_positions");
-  if (!result.length) return res.json({});
+  const result = await db.query("SELECT * FROM org_positions");
   const positions = {};
-  result[0].values.forEach(([userId, x, y]) => {
-    positions[userId] = { x, y };
+  result.rows.forEach(row => {
+    positions[row.user_id] = { x: row.x, y: row.y };
   });
   res.json(positions);
 });
 
 // 조직도 위치 저장
-router.put('/positions', authMiddleware, (req, res) => {
+router.put('/positions', authMiddleware, async (req, res) => {
   const db = getDB();
-  const positions = req.body; // { userId: { x, y }, ... }
+  const positions = req.body;
   for (const [userId, pos] of Object.entries(positions)) {
-    db.run("INSERT OR REPLACE INTO org_positions (user_id, x, y) VALUES (?, ?, ?)",
-      [userId, pos.x, pos.y]);
+    await db.query(
+      "INSERT INTO org_positions (user_id, x, y) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO UPDATE SET x = $2, y = $3",
+      [userId, pos.x, pos.y]
+    );
   }
-  save();
   res.json({ success: true });
 });
 

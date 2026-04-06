@@ -1,102 +1,78 @@
-const initSqlJs = require('sql.js');
-const fs = require('fs');
-const path = require('path');
+const { Pool } = require('pg');
 
-// Render Persistent Disk: /var/data, 로컬: backend/data/
-const DB_DIR = process.env.DB_PATH || path.join(__dirname, '..', 'data');
-const DB_PATH = path.join(DB_DIR, 'workhive.db');
-
-let db = null;
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
 
 async function initDB() {
-  const SQL = await initSqlJs();
-  const dir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const client = await pool.connect();
+  try {
+    await client.query(`CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT '사원',
+      dept TEXT DEFAULT '',
+      created_at TIMESTAMP DEFAULT NOW()
+    )`);
 
-  if (fs.existsSync(DB_PATH)) {
-    const buf = fs.readFileSync(DB_PATH);
-    db = new SQL.Database(buf);
-  } else {
-    db = new SQL.Database();
+    await client.query(`CREATE TABLE IF NOT EXISTS tasks (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL CHECK(type IN ('inst','rep','shared')),
+      title TEXT NOT NULL,
+      content TEXT DEFAULT '',
+      from_user_id TEXT NOT NULL REFERENCES users(id),
+      to_user_id TEXT REFERENCES users(id),
+      status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','done')),
+      due_date TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      done_at TIMESTAMP
+    )`);
+
+    await client.query(`CREATE TABLE IF NOT EXISTS relationships (
+      id TEXT PRIMARY KEY,
+      senior_id TEXT NOT NULL REFERENCES users(id),
+      junior_id TEXT NOT NULL REFERENCES users(id),
+      UNIQUE(senior_id, junior_id)
+    )`);
+
+    await client.query(`CREATE TABLE IF NOT EXISTS org_positions (
+      user_id TEXT PRIMARY KEY REFERENCES users(id),
+      x REAL DEFAULT 0,
+      y REAL DEFAULT 0
+    )`);
+
+    await client.query(`CREATE TABLE IF NOT EXISTS comments (
+      id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      content TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )`);
+
+    await client.query(`CREATE TABLE IF NOT EXISTS attachments (
+      id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id),
+      filename TEXT NOT NULL,
+      original_name TEXT NOT NULL,
+      size INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW()
+    )`);
+
+    console.log('Database tables initialized (PostgreSQL)');
+  } finally {
+    client.release();
   }
-
-  db.run(`CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT '사원',
-    dept TEXT DEFAULT '',
-    created_at TEXT DEFAULT (datetime('now','localtime'))
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS tasks (
-    id TEXT PRIMARY KEY,
-    type TEXT NOT NULL CHECK(type IN ('inst','rep','shared')),
-    title TEXT NOT NULL,
-    content TEXT DEFAULT '',
-    from_user_id TEXT NOT NULL,
-    to_user_id TEXT,
-    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','done')),
-    due_date TEXT,
-    created_at TEXT DEFAULT (datetime('now','localtime')),
-    done_at TEXT,
-    FOREIGN KEY (from_user_id) REFERENCES users(id),
-    FOREIGN KEY (to_user_id) REFERENCES users(id)
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS relationships (
-    id TEXT PRIMARY KEY,
-    senior_id TEXT NOT NULL,
-    junior_id TEXT NOT NULL,
-    FOREIGN KEY (senior_id) REFERENCES users(id),
-    FOREIGN KEY (junior_id) REFERENCES users(id),
-    UNIQUE(senior_id, junior_id)
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS org_positions (
-    user_id TEXT PRIMARY KEY,
-    x REAL DEFAULT 0,
-    y REAL DEFAULT 0,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS comments (
-    id TEXT PRIMARY KEY,
-    task_id TEXT NOT NULL,
-    user_id TEXT NOT NULL,
-    content TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now','localtime')),
-    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS attachments (
-    id TEXT PRIMARY KEY,
-    task_id TEXT NOT NULL,
-    user_id TEXT NOT NULL,
-    filename TEXT NOT NULL,
-    original_name TEXT NOT NULL,
-    size INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT (datetime('now','localtime')),
-    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  )`);
-
-  save();
-  console.log('Database initialized at', DB_PATH);
-  return db;
-}
-
-function save() {
-  if (!db) return;
-  const data = db.export();
-  const buffer = Buffer.from(data);
-  fs.writeFileSync(DB_PATH, buffer);
 }
 
 function getDB() {
-  return db;
+  return pool;
 }
+
+// save()는 PostgreSQL에서는 불필요 (자동 커밋) — 호환성 유지용
+function save() {}
 
 module.exports = { initDB, getDB, save };
