@@ -12,10 +12,20 @@ const router = express.Router();
 const UPLOAD_DIR = process.env.UPLOAD_PATH || path.join(__dirname, '..', '..', 'data', 'uploads');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
+// 한글 파일명 디코딩 (multer는 latin1로 인코딩함)
+function decodeFilename(name) {
+  try {
+    return Buffer.from(name, 'latin1').toString('utf8');
+  } catch {
+    return name;
+  }
+}
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOAD_DIR),
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
+    const decoded = decodeFilename(file.originalname);
+    const ext = path.extname(decoded);
     cb(null, uuidv4() + ext);
   }
 });
@@ -24,8 +34,9 @@ const upload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
+    const decoded = decodeFilename(file.originalname);
     const allowed = /\.(jpg|jpeg|png|gif|pdf|doc|docx|xls|xlsx|ppt|pptx|txt|zip|hwp)$/i;
-    if (allowed.test(path.extname(file.originalname))) cb(null, true);
+    if (allowed.test(path.extname(decoded))) cb(null, true);
     else cb(new Error('허용되지 않는 파일 형식입니다'));
   }
 });
@@ -48,14 +59,15 @@ router.post('/:taskId', authMiddleware, upload.single('file'), async (req, res) 
 
   const db = getDB();
   const id = uuidv4();
+  const originalName = decodeFilename(req.file.originalname);
   await db.query(
     "INSERT INTO attachments (id, task_id, user_id, filename, original_name, size) VALUES ($1, $2, $3, $4, $5, $6)",
-    [id, req.params.taskId, req.user.id, req.file.filename, req.file.originalname, req.file.size]
+    [id, req.params.taskId, req.user.id, req.file.filename, originalName, req.file.size]
   );
 
   res.status(201).json({
     id, task_id: req.params.taskId, user_id: req.user.id,
-    filename: req.file.filename, original_name: req.file.originalname, size: req.file.size
+    filename: req.file.filename, original_name: originalName, size: req.file.size
   });
 });
 
@@ -69,7 +81,10 @@ router.get('/download/:filename', authMiddleware, async (req, res) => {
   const filePath = path.join(UPLOAD_DIR, req.params.filename);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: '파일이 존재하지 않습니다' });
 
-  res.download(filePath, originalName);
+  // 한글 파일명을 위한 Content-Disposition 헤더 직접 설정
+  const encoded = encodeURIComponent(originalName).replace(/['()]/g, escape);
+  res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encoded}`);
+  res.sendFile(filePath);
 });
 
 // 파일 삭제
