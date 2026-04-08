@@ -44,11 +44,25 @@ if (require('fs').existsSync(frontendPath)) {
   });
 }
 
+// 헬스체크 엔드포인트
+app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+
+// Render 무료 플랜 sleep 방지 (14분마다 self-ping)
+function keepAlive() {
+  const url = process.env.RENDER_EXTERNAL_URL;
+  if (url) {
+    setInterval(() => {
+      require('https').get(`${url}/api/health`, () => {}).on('error', () => {});
+    }, 14 * 60 * 1000);
+  }
+}
+
 async function start() {
   await initDB();
   initMailer();
   app.listen(PORT, () => {
     console.log(`WorkHive server running at http://localhost:${PORT}`);
+    keepAlive();
   });
 }
 

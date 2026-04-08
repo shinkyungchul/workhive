@@ -41,6 +41,22 @@ const upload = multer({
   }
 });
 
+// 파일 다운로드 (/:taskId 보다 먼저 등록해야 "download"가 taskId로 잡히지 않음)
+router.get('/download/:filename', authMiddleware, async (req, res) => {
+  const db = getDB();
+  const result = await db.query("SELECT original_name FROM attachments WHERE filename = $1", [req.params.filename]);
+  if (result.rows.length === 0) return res.status(404).json({ error: '파일을 찾을 수 없습니다' });
+
+  const originalName = result.rows[0].original_name;
+  const filePath = path.join(UPLOAD_DIR, req.params.filename);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: '파일이 존재하지 않습니다' });
+
+  // 한글 파일명을 위한 Content-Disposition 헤더 직접 설정
+  const encoded = encodeURIComponent(originalName).replace(/['()]/g, escape);
+  res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encoded}`);
+  res.sendFile(filePath);
+});
+
 // 첨부파일 목록
 router.get('/:taskId', authMiddleware, async (req, res) => {
   const db = getDB();
@@ -69,22 +85,6 @@ router.post('/:taskId', authMiddleware, upload.single('file'), async (req, res) 
     id, task_id: req.params.taskId, user_id: req.user.id,
     filename: req.file.filename, original_name: originalName, size: req.file.size
   });
-});
-
-// 파일 다운로드
-router.get('/download/:filename', authMiddleware, async (req, res) => {
-  const db = getDB();
-  const result = await db.query("SELECT original_name FROM attachments WHERE filename = $1", [req.params.filename]);
-  if (result.rows.length === 0) return res.status(404).json({ error: '파일을 찾을 수 없습니다' });
-
-  const originalName = result.rows[0].original_name;
-  const filePath = path.join(UPLOAD_DIR, req.params.filename);
-  if (!fs.existsSync(filePath)) return res.status(404).json({ error: '파일이 존재하지 않습니다' });
-
-  // 한글 파일명을 위한 Content-Disposition 헤더 직접 설정
-  const encoded = encodeURIComponent(originalName).replace(/['()]/g, escape);
-  res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encoded}`);
-  res.sendFile(filePath);
 });
 
 // 파일 삭제
